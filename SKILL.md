@@ -1,80 +1,92 @@
 ---
 name: scrapling
 description: >
-  Expert Scrapling — framework Python de web scraping adaptatif (22k+ stars) gérant tout depuis une
-  requête simple jusqu'à un crawl full-scale avec pause/resume. Utiliser pour : choisir le bon
-  fetcher ou session (Fetcher/StealthyFetcher/DynamicFetcher + variantes Session/Async), activer le
-  mode self-healing (adaptive=True / auto_save=True), bypass Cloudflare Turnstile, configurer
-  ProxyRotator, sessions multi-types dans un spider, streaming de résultats, export JSON/JSONL,
-  intégrer le serveur MCP natif avec Claude/agent/Cursor, utiliser la CLI (extract/shell),
-  impersonation TLS (chrome/firefox), HTTP/3, migrer depuis BeautifulSoup/Scrapy, déployer via
-  Docker. Déclencher aussi pour : "scraper auto-réparant", "sélecteur cassé redesign", "bypass
-  anti-bot Python", "session scraping persistante", "crawl pause resume Python", "scrapling
-  install", "scrapling MCP", "scrapling spider", "scrapling session", "impersonate chrome scraping".
+  Expert Scrapling — framework Python de web scraping adaptatif gérant tout depuis une requête
+  simple jusqu'à un crawl full-scale avec pause/resume. Utiliser pour : choisir le bon fetcher ou
+  session (Fetcher / StealthyFetcher / DynamicFetcher + variantes Session / Async), activer le
+  self-healing (adaptive=True / auto_save=True), bypass Cloudflare Turnstile, rotation de proxies
+  (ProxyRotator), spiders multi-sessions, streaming d'items, export JSON/JSONL, intégrer le serveur
+  MCP natif avec Claude/Cursor, utiliser la CLI (extract / shell / mcp), impersonation TLS
+  (chrome/firefox), HTTP/3, migrer depuis BeautifulSoup/Scrapy, déployer via Docker. Déclencher
+  aussi pour : "scraper auto-réparant", "sélecteur cassé après redesign", "bypass anti-bot Python",
+  "session scraping persistante", "crawl pause resume Python", "scrapling install", "scrapling mcp",
+  "scrapling spider", "scrapling session", "impersonate chrome scraping", "ProxyRotator".
 ---
 
 # Scrapling — Framework Python de Scraping Adaptatif
 
-**22.7k stars · 92% test coverage · Python 3.10+**
-Docs complètes : https://scrapling.readthedocs.io
+**Cible : Scrapling v0.4.x (vérifié sur 0.4.9) · Python 3.10+ · Licence BSD-3-Clause (auteur : Karim Shoair / D4Vinci)**
+Docs : https://scrapling.readthedocs.io · Repo : https://github.com/D4Vinci/Scrapling
+
+> **Épingler la version** : `pip install "scrapling==0.4.9"`. La série 0.4 a introduit des changements d'API majeurs (spiders async, ProxyRotator). Un skill non versionné se périme silencieusement.
+
+---
+
+## Quand utiliser ce skill — et quand NE PAS
+
+Utiliser pour : extraction HTML/DOM, contournement d'anti-bot, crawl multi-pages, self-healing de sélecteurs, migration depuis BS4/Scrapy, intégration MCP.
+
+Ne **pas** utiliser pour : APIs JSON publiques (un simple `httpx`/`requests` suffit), automatisation d'actions authentifiées complexes (Playwright brut), ou tout scraping qui violerait les CGU / le `robots.txt` / le RGPD. Scrapling est fourni pour usage éducatif et recherche : respecter robots.txt, les CGU et ne pas collecter de données personnelles sans base légale.
 
 ---
 
 ## Installation
 
 ```bash
-# Parser seul (sans fetchers)
-pip install scrapling
+pip install "scrapling[fetchers]"   # recommandé : parser + fetchers
+scrapling install                   # OBLIGATOIRE avant tout fetcher navigateur (Chromium + deps)
+                                     # après un upgrade : scrapling install --force (rafraîchit les fingerprints)
 
-# Avec fetchers + navigateurs (recommandé)
-pip install "scrapling[fetchers]"
-scrapling install           # télécharge Chromium + dépendances système
+pip install scrapling               # parser seul, sans réseau
+pip install "scrapling[all]"        # fetchers + MCP + shell
+pip install "scrapling[ai]"         # serveur MCP uniquement
+pip install "scrapling[shell]"      # CLI shell + commande extract
 
-# Tout inclus (fetchers + MCP + shell)
-pip install "scrapling[all]"
-
-# À la carte
-pip install "scrapling[ai]"     # MCP server
-pip install "scrapling[shell]"  # CLI shell + commande extract
-
-# Docker (all extras + browsers)
-docker pull pyd4vinci/scrapling
-docker pull ghcr.io/d4vinci/scrapling:latest
+docker pull pyd4vinci/scrapling     # ou : ghcr.io/d4vinci/scrapling:latest
 ```
 
+> **Piège n°1** : oublier `scrapling install`. Sans lui, `StealthyFetcher`/`DynamicFetcher` échouent (pas de navigateur). `Fetcher` (HTTP pur) fonctionne sans.
+
 ---
 
-## Architecture — Choisir le bon outil
+## Choisir le bon outil — arbre de décision
 
-### Fetchers (one-shot) vs Sessions (persistantes)
+```
+Le HTML voulu arrive-t-il via une simple requête HTTP ?
+├─ OUI ─ besoin d'un fingerprint navigateur (TLS + headers) ?
+│        ├─ NON  → Fetcher / AsyncFetcher
+│        └─ OUI  → Fetcher(impersonate='chrome')      # curl_cffi, AUCUN navigateur lancé
+└─ NON (JS requis OU anti-bot)
+         ├─ anti-bot (Cloudflare/Turnstile, DataDome…) → StealthyFetcher(solve_cloudflare=True)
+         └─ SPA / rendu JS, sans anti-bot               → DynamicFetcher
+```
 
-| Besoin | One-shot | Session persistante | Async session |
-|--------|----------|--------------------|----|
-| HTTP rapide | `Fetcher` | `FetcherSession` | `AsyncFetcher` |
-| Bypass Cloudflare / anti-bot | `StealthyFetcher` | `StealthySession` | `AsyncStealthySession` |
+Puis : **multi-pages ou état partagé ?** → passer en classe **Session** (cookies + navigateur conservés entre appels). **Crawl full-scale ?** → **Spider**.
+
+| Besoin | One-shot | Session persistante | Async |
+|--------|----------|---------------------|-------|
+| HTTP rapide | `Fetcher` | `FetcherSession` | `AsyncFetcher` (one-shot async) |
+| Bypass anti-bot | `StealthyFetcher` | `StealthySession` | `AsyncStealthySession` |
 | JS lourd / SPA | `DynamicFetcher` | `DynamicSession` | `AsyncDynamicSession` |
 
-> **Règle** : utilise les classes Session pour tout crawl multi-pages (cookies partagés, état navigateur conservé). Les one-shot ouvrent/ferment un browser à chaque appel.
+> Note : il n'existe pas d'`AsyncFetcherSession`. Pour de l'HTTP async, utiliser `AsyncFetcher` dans un `asyncio.gather()`.
 
 ---
 
-## Fetchers — Exemples concrets
+## Fetchers — exemples vérifiés
 
-### HTTP rapide avec impersonation TLS
+### HTTP rapide + impersonation TLS
 
 ```python
 from scrapling.fetchers import Fetcher, FetcherSession
 
-# One-shot
-page = Fetcher.get('https://quotes.toscrape.com/')
+page = Fetcher.get('https://quotes.toscrape.com/')              # one-shot
 
-# Session persistante avec fingerprint Chrome
-with FetcherSession(impersonate='chrome') as session:
-    page1 = session.get('https://site.com/page1', stealthy_headers=True)
-    page2 = session.get('https://site.com/page2', impersonate='firefox135')
+with FetcherSession(impersonate='chrome') as session:          # session persistante
+    p1 = session.get('https://site.com/page1', stealthy_headers=True)
+    p2 = session.get('https://site.com/page2', impersonate='firefox135')
 
-# HTTP/3
-with FetcherSession(http3=True) as session:
+with FetcherSession(http3=True) as session:                    # HTTP/3
     page = session.get('https://site.com/')
 ```
 
@@ -83,19 +95,19 @@ with FetcherSession(http3=True) as session:
 ```python
 from scrapling.fetchers import StealthyFetcher, StealthySession
 
-# One-shot
-page = StealthyFetcher.fetch('https://nopecha.com/demo/cloudflare')
+page = StealthyFetcher.fetch('https://nopecha.com/demo/cloudflare')  # one-shot
 
-# Session persistante (browser ouvert en continu)
 with StealthySession(headless=True, solve_cloudflare=True) as session:
     page = session.fetch('https://protected-site.com', google_search=False)
     data = page.css('#content a').getall()
 ```
 
-### Sites SPA / JavaScript lourd
+> `solve_cloudflare=True` lance un vrai navigateur (coût temps/CPU). Ne l'activer que si la cible est réellement protégée.
+
+### SPA / JavaScript lourd
 
 ```python
-from scrapling.fetchers import DynamicFetcher, DynamicSession
+from scrapling.fetchers import DynamicSession
 
 with DynamicSession(headless=True, network_idle=True) as session:
     page = session.fetch('https://react-app.com', load_dom=False)
@@ -104,26 +116,30 @@ with DynamicSession(headless=True, network_idle=True) as session:
 
 ---
 
-## Self-Healing Selectors (Adaptive)
+## Self-Healing Selectors (adaptive) — workflow en 2 temps
+
+`adaptive=True` ne sait relocaliser un élément **que s'il a été enregistré** lors d'un run précédent. C'est un workflow en deux phases, pas un drapeau magique.
 
 ```python
-# Phase 1 — première exécution : sauvegarde la signature de l'élément
+# Phase 1 — premier run : on enregistre la signature de l'élément
 products = page.css('.product-card', auto_save=True)
 
-# Phase 2 — après redesign du site : retrouve l'élément par similarité
+# Phase 2 — après redesign du site : on retrouve l'élément par similarité
 products = page.css('.product-card', adaptive=True)
 
-# Ou au niveau du fetcher entier
+# Au niveau du fetcher entier
 StealthyFetcher.adaptive = True
 page = StealthyFetcher.fetch('https://example.com', headless=True)
 ```
 
+> `percentage` (défaut 40) règle le seuil minimal de similarité accepté en mode adaptive. Ne pas y toucher sans raison : le calcul dépend de la structure de la page.
+
 ---
 
-## Extraction & Navigation
+## Extraction & navigation
 
 ```python
-# CSS (pseudo-éléments Scrapy/Parsel compatibles)
+# CSS (pseudo-éléments Parsel/Scrapy compatibles)
 titles = page.css('h2.title::text').getall()
 href   = page.css('a::attr(href)').get()
 
@@ -133,7 +149,6 @@ price = page.xpath('//span[@class="price"]/text()').get()
 # Style BeautifulSoup
 items = page.find_all('div', class_='product')
 items = page.find_all(['div', 'article'], class_='card')
-items = page.find_all(class_='product')
 
 # Recherche par texte
 btn = page.find_by_text('add to cart', tag='button')
@@ -148,19 +163,19 @@ similar  = element.find_similar()
 # Chaînage
 text = page.css('.quote')[0].css('.text::text').get()
 
-# Génération auto de sélecteurs
+# Génération auto de sélecteurs (utile en shell pour figer un sélecteur robuste)
 css_sel   = element.generate_css_selector
 xpath_sel = element.generate_xpath_selector
 ```
 
 ---
 
-## Spiders — Crawl Full-Scale
+## Spiders — crawl full-scale
 
-### Spider basique avec export
+### Spider basique + export
 
 ```python
-from scrapling.spiders import Spider, Request, Response
+from scrapling.spiders import Spider, Response
 
 class QuotesSpider(Spider):
     name = "quotes"
@@ -177,13 +192,36 @@ class QuotesSpider(Spider):
         if next_page:
             yield response.follow(next_page[0].attrib['href'])
 
-result = QuotesSpider().start()
+result = QuotesSpider().start()            # -> CrawlResult
 print(f"Scraped {len(result.items)} items")
 result.items.to_json("output.json")
 result.items.to_jsonl("output.jsonl")
 ```
 
-### Multi-Session Spider
+### Hooks de cycle de vie (le vrai pipeline)
+
+Scrapling **n'a pas** de hook `process_item`. Les hooks réels, à surcharger sur la classe `Spider` :
+
+```python
+class MySpider(Spider):
+    async def on_scraped_item(self, item: dict) -> dict | None:
+        """Pipeline post-extraction : nettoyage, validation, push DB/API.
+        Retourner None pour drop l'item."""
+        await save_to_db(item)
+        return item
+
+    async def is_blocked(self, response: Response) -> bool:
+        return response.status in (403, 429) or "captcha" in response.body.lower()
+
+    async def retry_blocked_request(self, request, response):
+        return request                       # ré-essai (ex. via une autre session)
+
+    async def on_error(self, request, error: Exception): ...
+    async def on_start(self, resuming: bool = False): ...
+    async def on_close(self): ...
+```
+
+### Multi-session spider
 
 ```python
 from scrapling.spiders import Spider, Request, Response
@@ -199,106 +237,137 @@ class MultiSessionSpider(Spider):
 
     async def parse(self, response: Response):
         for link in response.css('a::attr(href)').getall():
-            if "protected" in link:
-                yield Request(link, sid="stealth")
-            else:
-                yield Request(link, sid="fast", callback=self.parse)
+            sid = "stealth" if "protected" in link else "fast"
+            yield Request(link, sid=sid, callback=self.parse)
 ```
 
-### Pause & Resume
+> Le moteur de crawl est **async**. Pour les cibles lourdes, privilégier des sessions async (`AsyncStealthySession`, `AsyncDynamicSession`) ; `lazy=True` diffère l'ouverture du navigateur au premier usage.
+
+### Pause & resume
 
 ```python
-# Lancer avec checkpoint
 QuotesSpider(crawldir="./crawl_data").start()
-# Ctrl+C → sauvegarde auto · Relancer → reprend depuis le checkpoint
+# Ctrl+C -> checkpoint sauvegardé · relancer la même commande -> reprise auto
 ```
 
 ### Streaming temps réel
 
 ```python
-async for item in spider.stream():
-    await save_to_db(item)   # reçoit les items au fil de l'eau
+spider = QuotesSpider()
+async for item in spider.stream():          # items au fil de l'eau + stats live
+    await push_to_pipeline(item)
 ```
 
 ---
 
-## ProxyRotator + Blocage ads
+## ProxyRotator — usage correct
+
+L'import top-level `from scrapling import ProxyRotator` **n'existe pas**. La rotation se branche via le paramètre `proxy_rotator=` du fetcher/session, et est **exclusive** avec `proxy=` / `proxies=` (sinon erreur).
 
 ```python
-from scrapling import ProxyRotator
-from scrapling.fetchers import StealthyFetcher
+from scrapling.fetchers import StealthyFetcher, StealthySession
+from scrapling.engines.toolbelt.proxy_rotation import ProxyRotator
 
 rotator = ProxyRotator(proxies=[
     'http://user:pass@proxy1:8080',
     'http://user:pass@proxy2:8080',
 ])
 
-page = StealthyFetcher.fetch(
-    'https://target.com',
-    proxy=rotator.next(),
-    block_ads=True     # bloque ~3500 domaines
-)
+# Brancher le rotator sur la session (PAS proxy=rotator.next())
+with StealthySession(proxy_rotator=rotator, headless=True) as session:
+    page = session.fetch('https://target.com', block_ads=True)   # block_ads ~3500 domaines
+
+# Récupérer un proxy manuellement si besoin : rotator.get_proxy()  (il n'y a pas de .next())
 ```
 
-> Pour Cloudflare entreprise : proxies résidentiels (BirdProxies, Evomi, DataImpulse).
-> Pour Akamai/DataDome/Kasada/Incapsula : API [Hyper Solutions](https://hypersolutions.co).
+> Cloudflare entreprise → proxies résidentiels (NodeMaven, BirdProxies, Evomi, DataImpulse).
+> Akamai/DataDome/Kasada/Incapsula → service dédié type Hyper Solutions (hypersolutions.co).
+> **v0.4.9** corrige un bug où le `proxy` de session HTTP était ignoré silencieusement (fuite d'IP réelle). Mettre à jour si vous étiez < 0.4.9.
 
 ---
 
-## MCP Server — Intégration Claude / agent / Cursor
+## Serveur MCP — Claude / Cursor
 
 ```bash
 pip install "scrapling[ai]"
+
+scrapling mcp                                  # transport stdio (défaut)
+scrapling mcp --http --host 0.0.0.0 --port 8000   # transport streamable-http
 ```
 
-**Avantage tokens** : l'IA reçoit uniquement les données extraites, pas le HTML brut.
+**Avantage tokens** : l'agent reçoit les données extraites, jamais le HTML brut.
 
-### server.json
+`mcp.json` (config Claude/Cursor, transport stdio) :
 
 ```json
 {
   "mcpServers": {
     "scrapling": {
-      "command": "python",
-      "args": ["-m", "scrapling.mcp"]
+      "command": "scrapling",
+      "args": ["mcp"]
     }
   }
 }
 ```
 
-Docs MCP : https://scrapling.readthedocs.io/en/latest/ai/mcp-server/
+> Le module `scrapling.mcp` et les variables d'env `SCRAPLING_*` n'existent pas : c'est la commande CLI `scrapling mcp` (classe `scrapling.core.ai.ScraplingMCPServer`).
+> Docs MCP : https://scrapling.readthedocs.io/en/latest/ai/mcp-server/
 
 ---
 
 ## CLI
 
 ```bash
-# Shell interactif IPython (debug sélecteurs, curl→Scrapling, preview dans browser)
-scrapling shell
+scrapling shell                       # IPython interactif : debug sélecteurs, preview navigateur
 scrapling shell https://example.com
 
-# Extraction directe vers fichier (.txt / .md / .html)
-scrapling extract get 'https://example.com' output.md
-scrapling extract get 'https://example.com' output.txt --css-selector '#content' --impersonate 'chrome'
-scrapling extract fetch 'https://example.com' output.md --no-headless
+scrapling extract get 'https://example.com' out.md
+scrapling extract get 'https://example.com' out.txt --css-selector '#content' --impersonate 'chrome'
+scrapling extract fetch 'https://example.com' out.md --no-headless
 scrapling extract stealthy-fetch 'https://cf-site.com' out.html --solve-cloudflare
+
+scrapling --version
 ```
 
 ---
 
-## Benchmarks
+## Migration BeautifulSoup → Scrapling
 
-| Librairie | 5000 éléments | vs Scrapling |
-|-----------|--------------|-------------|
-| **Scrapling** | **2.02 ms** | 1.0x |
-| Parsel/Scrapy | 2.04 ms | ~1x |
-| Raw Lxml | 2.54 ms | 1.3x |
-| PyQuery | 24.17 ms | ~12x |
-| Selectolax | 82.63 ms | ~41x |
-| BS4 + lxml | 1584 ms | **~784x** |
-| BS4 + html5lib | 3391 ms | ~1679x |
+| BeautifulSoup4 | Scrapling |
+|----------------|-----------|
+| `requests.get(url)` + BS4 | `Fetcher.get(url)` (tout-en-un) |
+| `soup.find_all('div', class_='x')` | `page.find_all('div', class_='x')` |
+| `soup.find('h2').text` | `page.css('h2::text').get()` |
+| `el.get('href')` | `el.attrib['href']` ou `page.css('a::attr(href)').get()` |
+| `el.find_next_sibling()` | `el.next_sibling` |
+| (aucun anti-bot) | `StealthyFetcher.fetch(url, solve_cloudflare=True)` |
+| (aucun self-healing) | `page.css('.x', adaptive=True)` |
 
-**Adaptive finding** : Scrapling 2.39ms vs AutoScraper 12.45ms (5.2x plus rapide).
+---
+
+## Pièges fréquents (checklist)
+
+- [ ] `scrapling install` exécuté avant tout fetcher navigateur ?
+- [ ] Version épinglée (`==0.4.9`) — l'API 0.4 a changé vs 0.3 ?
+- [ ] ProxyRotator branché via `proxy_rotator=`, jamais avec `proxy=` ?
+- [ ] `adaptive=True` précédé d'un run `auto_save=True` ?
+- [ ] Spider : pipeline dans `on_scraped_item`, pas `process_item` ?
+- [ ] `solve_cloudflare=True` réservé aux cibles réellement protégées (coûteux) ?
+- [ ] robots.txt / CGU / RGPD respectés ?
+
+---
+
+## Benchmarks (ordre de grandeur, parsing de 5000 éléments)
+
+| Librairie | Temps | vs Scrapling |
+|-----------|-------|--------------|
+| **Scrapling / Parsel** | ~2 ms | 1x |
+| Raw lxml | ~2.5 ms | ~1.3x |
+| PyQuery | ~24 ms | ~12x |
+| Selectolax | ~83 ms | ~41x |
+| BS4 + lxml | ~1.6 s | ~780x |
+
+Chiffres officiels du repo (susceptibles d'évoluer entre versions). Le gain réel dépend de votre charge ; benchmarkez votre cas.
 
 ---
 
@@ -315,4 +384,4 @@ titles = page.css('h2::text').getall()
 
 ## Références
 
-→ `references/patterns.md` — Patterns d'intégration stack agent/n8n/Neon/content-pipeline
+→ `references/patterns.md` — patterns d'intégration réutilisables (monitoring prix, crawl → PostgreSQL, MCP → agent, async batch).

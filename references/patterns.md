@@ -1,207 +1,212 @@
-# Scrapling — Patterns Stack agent / n8n / Neon / content-pipeline
+# Scrapling — Patterns d'intégration réutilisables
 
-## 1. Monitoring de prix avec alerte Telegram
+Patterns génériques, sans secrets, prêts à adapter. Toute valeur sensible passe par variable
+d'environnement (`os.environ`). Cible : Scrapling v0.4.9.
+
+---
+
+## 1. Monitoring de prix avec alerte
 
 ```python
+import asyncio, os, httpx
 from scrapling.fetchers import StealthySession
-import asyncio, httpx
 
-TELEGRAM_TOKEN = "..."
-CHAT_ID = "REDACTED_CHAT_ID"  # ton chat_id agent
+WEBHOOK_URL = os.environ["ALERT_WEBHOOK_URL"]   # ex. endpoint Telegram/Slack/Discord
 
 async def alert(msg: str):
     async with httpx.AsyncClient() as c:
-        await c.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                     json={"chat_id": CHAT_ID, "text": msg})
+        await c.post(WEBHOOK_URL, json={"text": msg})
 
-async def monitor_price(url: str, selector: str, threshold: float):
+async def monitor_price(url: str, selector: str, threshold: float, interval: int = 3600):
     with StealthySession(headless=True, solve_cloudflare=True) as session:
+        # 1er passage : enregistre la signature pour le self-healing
+        first = session.fetch(url, network_idle=True)
+        first.css(selector, auto_save=True)
         while True:
             page = session.fetch(url, network_idle=True)
             el = page.css(selector, adaptive=True)
             if el:
-                price = float(el.text.replace('€','').replace(',','.').strip())
-                if price <= threshold:
-                    await alert(f"🔔 Prix cible : {price}€\n{url}")
-            await asyncio.sleep(3600)
+                raw = el.css('::text').get('').replace('€', '').replace(',', '.').strip()
+                try:
+                    price = float(raw)
+                    if price <= threshold:
+                        await alert(f"🔔 Prix cible atteint : {price}€\n{url}")
+                except ValueError:
+                    pass
+            await asyncio.sleep(interval)
 ```
 
 ---
 
-## 2. Crawl multi-pages → Neon PostgreSQL (FastAPI sur Elysium VPS)
-
-Endpoint FastAPI à déployer sur `REDACTED_HOST` :
+## 2. Crawl multi-pages → PostgreSQL (endpoint FastAPI)
 
 ```python
+import os
 from fastapi import FastAPI
+from pydantic import BaseModel
 from scrapling.fetchers import Fetcher, StealthyFetcher
-from scrapling.spiders import Spider, Response
 import asyncpg
 
 app = FastAPI()
-NEON_DSN = "postgresql://..."
+DSN = os.environ["DATABASE_URL"]
+
+class ScrapeReq(BaseModel):
+    url: str
+    selector: str
+    stealth: bool = False
+    adaptive: bool = False
 
 @app.post("/scrape/batch")
-async def scrape_batch(payload: dict):
-    """
-    payload: { url, selector, stealth=False, adaptive=False }
-    """
-    url      = payload["url"]
-    selector = payload["selector"]
-    stealth  = payload.get("stealth", False)
-    adaptive = payload.get("adaptive", False)
+async def scrape_batch(req: ScrapeReq):
+    if req.stealth:
+        page = StealthyFetcher.fetch(req.url, block_ads=True)
+    else:
+        page = Fetcher.get(req.url)
 
-    fetcher = StealthyFetcher if stealth else Fetcher
-    page    = fetcher.fetch(url, block_ads=True) if stealth else fetcher.get(url)
-
-    results = [
-        {"text": el.text, "href": el.attrib.get("href", "")}
-        for el in page.css(selector, adaptive=adaptive, auto_save=not adaptive)
+    rows = [
+        (req.url, req.selector, el.css('::text').get(''), el.attrib.get("href", ""))
+        for el in page.css(req.selector, adaptive=req.adaptive, auto_save=not req.adaptive)
     ]
 
-    conn = await asyncpg.connect(NEON_DSN)
-    await conn.executemany(
-        "INSERT INTO scraped_data (url, selector, text, href, scraped_at) "
-        "VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT DO NOTHING",
-        [(url, selector, r["text"], r["href"]) for r in results]
-    )
-    await conn.close()
-
-    return {"count": len(results), "data": results}
+    conn = await asyncpg.connect(DSN)
+    try:
+        await conn.executemany(
+            "INSERT INTO scraped_data (url, selector, text, href, scraped_at) "
+            "VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT DO NOTHING",
+            rows,
+        )
+    finally:
+        await conn.close()
+    return {"count": len(rows)}
 ```
 
-**Appel depuis n8n** :
-- Nœud HTTP Request → POST `http://REDACTED_HOST:PORT/scrape/batch`
-- Body : `{"url": "...", "selector": ".price", "stealth": true}`
+Appel (n8n, cron, autre service) : `POST /scrape/batch` avec
+`{"url": "...", "selector": ".price", "stealth": true}`.
 
 ---
 
-## 3. Spider de veille BTP Mayotte → content-pipeline Pipeline
+## 3. Spider de veille → pipeline de contenu
 
 ```python
+import os, httpx
 from scrapling.spiders import Spider, Response
 from scrapling.fetchers import FetcherSession
-import httpx
 
-content-pipeline_ENDPOINT = "http://REDACTED_HOST:PORT/api/content/ingest"
+INGEST_ENDPOINT = os.environ["CONTENT_INGEST_URL"]
 
-class BTPVeilleSpider(Spider):
-    """
-    Scrape sources BTP/actualités Mayotte et injecte dans content-pipeline
-    pour scoring [internal-framework] et publication automatisée.
-    """
-    name = "btp_veille"
+class VeilleSpider(Spider):
+    """Scrape des sources d'actualité et pousse chaque article vers un pipeline."""
+    name = "veille"
     start_urls = [
         "https://www.batiactu.com/",
-        "https://mayottehebdo.com/",
-        "https://outremers360.com/",
+        # ajouter vos sources
     ]
     concurrent_requests = 3
-    download_delay = 2.0  # politesse
+    download_delay = 2.0          # politesse
 
     def configure_sessions(self, manager):
         manager.add("http", FetcherSession(impersonate="chrome", stealthy_headers=True))
 
     async def parse(self, response: Response):
         for article in response.css('article', auto_save=True):
-            title   = article.css('h2::text, h3::text', adaptive=True).get('').strip()
-            excerpt = article.css('.excerpt::text, p::text', adaptive=True).get('').strip()
-            url     = article.css('a::attr(href)', adaptive=True).get('')
-
+            title = (article.css('h2::text, h3::text').get('') or '').strip()
             if title and len(title) > 15:
-                item = {
+                yield {
                     "title":   title,
-                    "excerpt": excerpt,
-                    "url":     url,
+                    "excerpt": (article.css('.excerpt::text, p::text').get('') or '').strip(),
+                    "url":     article.css('a::attr(href)').get(''),
                     "source":  response.url,
-                    "pipeline": "content-pipeline",
                 }
-                yield item
 
-    async def process_item(self, item: dict):
-        """Hook post-extraction → push vers content-pipeline FastAPI"""
+    async def on_scraped_item(self, item: dict):
+        """Hook réel post-extraction (PAS process_item)."""
         async with httpx.AsyncClient() as c:
-            await c.post(content-pipeline_ENDPOINT, json=item)
+            await c.post(INGEST_ENDPOINT, json=item)
+        return item
 
-# Lancer avec pause/resume
-BTPVeilleSpider(crawldir="./btp_crawl").start()
+VeilleSpider(crawldir="./veille_crawl").start()   # pause/resume activé
 ```
 
 ---
 
-## 4. Commande agent Telegram → Scrapling MCP
+## 4. Commande agent → Scrapling MCP
 
-Workflow : `/scrape <url> <selector>` dans Telegram → agent → MCP Scrapling → résultat propre.
+Workflow : `/scrape <url> <selector>` côté agent → serveur MCP Scrapling → données structurées.
 
-**System prompt MANA skill KAZI/KAITO** (section tools) :
+Lancement du serveur :
 
+```bash
+scrapling mcp                                     # stdio (Claude Desktop / Cursor local)
+scrapling mcp --http --host 0.0.0.0 --port 8000   # HTTP (serveur distant)
 ```
-Tu as accès au MCP Scrapling. Quand l'utilisateur demande d'extraire des données
-d'un site web, utilise scrapling_fetch avec les paramètres appropriés.
-Retourne uniquement les données structurées, jamais le HTML brut.
-```
 
-**server.json sur Elysium VPS** :
+`mcp.json` :
 
 ```json
 {
   "mcpServers": {
     "scrapling": {
-      "command": "python",
-      "args": ["-m", "scrapling.mcp"],
-      "env": {
-        "SCRAPLING_DEFAULT_STEALTH": "true",
-        "SCRAPLING_BLOCK_ADS": "true"
-      }
+      "command": "scrapling",
+      "args": ["mcp"]
     }
   }
 }
 ```
 
+Instruction système (section outils de l'agent) :
+
+```
+Tu as accès au serveur MCP Scrapling. Pour extraire des données d'un site, appelle l'outil de
+fetch approprié et retourne uniquement les données structurées, jamais le HTML brut.
+```
+
 ---
 
-## 5. Async batch (haute volumétrie) + export Neon
+## 5. Async batch haute volumétrie → PostgreSQL
 
 ```python
-import asyncio
+import asyncio, os
 from scrapling.fetchers import AsyncFetcher
 import asyncpg
 
-async def batch_scrape_and_store(urls: list[str], selector: str, neon_dsn: str):
-    conn = await asyncpg.connect(neon_dsn)
+async def batch_scrape_and_store(urls: list[str], selector: str):
+    conn = await asyncpg.connect(os.environ["DATABASE_URL"])
 
     async def scrape_one(url: str):
         try:
-            page  = await AsyncFetcher.get(url, block_ads=True)
-            items = page.css(selector, auto_save=True)
-            return [(url, el.text, el.attrib.get("href","")) for el in items]
+            page = await AsyncFetcher.get(url, block_ads=True)
+            return [(url, el.css('::text').get(''), el.attrib.get("href", ""))
+                    for el in page.css(selector, auto_save=True)]
         except Exception as e:
             print(f"[ERR] {url}: {e}")
             return []
 
     results = await asyncio.gather(*[scrape_one(u) for u in urls])
-    flat    = [row for batch in results for row in batch]
+    flat = [row for batch in results for row in batch]
 
-    await conn.executemany(
-        "INSERT INTO scraped_data (url, text, href, scraped_at) "
-        "VALUES ($1, $2, $3, NOW()) ON CONFLICT DO NOTHING",
-        flat
-    )
-    await conn.close()
+    try:
+        await conn.executemany(
+            "INSERT INTO scraped_data (url, text, href, scraped_at) "
+            "VALUES ($1, $2, $3, NOW()) ON CONFLICT DO NOTHING",
+            flat,
+        )
+    finally:
+        await conn.close()
     print(f"Stored {len(flat)} rows")
 ```
 
 ---
 
-## 6. Migration BS4 → Scrapling (cheat sheet)
+## 6. Rotation de proxies (usage correct)
 
-| BeautifulSoup4 | Scrapling |
-|----------------|-----------|
-| `soup.find_all('div', class_='x')` | `page.find_all('div', class_='x')` |
-| `soup.find('h2').text` | `page.css('h2::text').get()` |
-| `el.get('href')` | `el.attrib['href']` ou `page.css('a::attr(href)').get()` |
-| `el.parent` | `el.parent` |
-| `el.find_next_sibling()` | `el.next_sibling` |
-| `requests.get(url)` + BS4 | `Fetcher.get(url)` (tout en un) |
-| Aucun anti-bot | `StealthyFetcher.fetch(url)` |
-| Aucun self-healing | `page.css('.x', adaptive=True)` |
+```python
+import os
+from scrapling.fetchers import StealthySession
+from scrapling.engines.toolbelt.proxy_rotation import ProxyRotator
+
+rotator = ProxyRotator(proxies=os.environ["PROXY_LIST"].split(","))
+
+# proxy_rotator= sur la session — exclusif avec proxy=/proxies=
+with StealthySession(proxy_rotator=rotator, headless=True) as session:
+    page = session.fetch("https://target.com", block_ads=True)
+```
