@@ -24,5 +24,7 @@ Use GitHub's private security reporting mechanism when available. Do not publish
 - GitHub Actions use least-privilege permissions.
 - Third-party actions are pinned by full commit SHA.
 - Pull-request validation does not require privileged repository secrets.
-- Validators scan tracked text for high-confidence credential patterns.
+- Active skill/reference files are scanned for high-confidence credential patterns and Python example syntax.
+- Historical `*.pre-2026-08-15.md` snapshots are preserved byte-for-byte as evidence of the previous public state and excluded from active-example validation; they are not current guidance.
+- Repository-level GitHub secret scanning/push protection should remain enabled when available because it covers the whole history independently of the active-doc validator.
 - Upstream compatibility is pinned and re-checked; a new release invalidates an unqualified “verified latest” claim until reviewed.

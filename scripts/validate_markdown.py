@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Validate fenced Python examples and reject obvious secret patterns."""
+"""Validate active fenced Python examples and reject obvious secret patterns.
+
+Historical `*.pre-2026-08-15.md` snapshots are immutable evidence of the previous
+public state. They are intentionally excluded from active-example validation; the
+current skill and references must satisfy the stricter checks.
+"""
 
 from __future__ import annotations
 
@@ -16,13 +21,22 @@ SECRET_PATTERNS = {
     "Telegram bot token": re.compile(r"\b\d{8,12}:[A-Za-z0-9_-]{20,}\b"),
     "credentialed URL": re.compile(r"https?://[^\s/:]+:[^\s/@]+@", re.I),
 }
+HISTORICAL_SUFFIX = ".pre-2026-08-15.md"
+
+
+def is_historical(path: Path) -> bool:
+    return path.name.endswith(HISTORICAL_SUFFIX)
 
 
 def main() -> int:
     errors: list[str] = []
     checked = 0
+    archived = 0
     for path in sorted(ROOT.rglob("*.md")):
         if ".git" in path.parts:
+            continue
+        if is_historical(path):
+            archived += 1
             continue
         text = path.read_text(encoding="utf-8")
         for label, pattern in SECRET_PATTERNS.items():
@@ -38,7 +52,7 @@ def main() -> int:
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
-    print(f"Validated {checked} fenced Python blocks.")
+    print(f"Validated {checked} active fenced Python blocks; preserved {archived} historical snapshots.")
     return 0
 
 
