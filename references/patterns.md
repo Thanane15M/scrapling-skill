@@ -1,212 +1,151 @@
-# Scrapling — Patterns d'intégration réutilisables
+# Scrapling integration patterns — pinned to 0.4.14
 
-Patterns génériques, sans secrets, prêts à adapter. Toute valeur sensible passe par variable
-d'environnement (`os.environ`). Cible : Scrapling v0.4.9.
+These examples are intentionally generic and secret-free. Re-run `scripts/verify_upstream.py` before using them with a different Scrapling version.
 
----
-
-## 1. Monitoring de prix avec alerte
+## 1. Fast HTTP extraction
 
 ```python
-import asyncio, os, httpx
-from scrapling.fetchers import StealthySession
+from scrapling.fetchers import Fetcher
 
-WEBHOOK_URL = os.environ["ALERT_WEBHOOK_URL"]   # ex. endpoint Telegram/Slack/Discord
-
-async def alert(msg: str):
-    async with httpx.AsyncClient() as c:
-        await c.post(WEBHOOK_URL, json={"text": msg})
-
-async def monitor_price(url: str, selector: str, threshold: float, interval: int = 3600):
-    with StealthySession(headless=True, solve_cloudflare=True) as session:
-        # 1er passage : enregistre la signature pour le self-healing
-        first = session.fetch(url, network_idle=True)
-        first.css(selector, auto_save=True)
-        while True:
-            page = session.fetch(url, network_idle=True)
-            el = page.css(selector, adaptive=True)
-            if el:
-                raw = el.css('::text').get('').replace('€', '').replace(',', '.').strip()
-                try:
-                    price = float(raw)
-                    if price <= threshold:
-                        await alert(f"🔔 Prix cible atteint : {price}€\n{url}")
-                except ValueError:
-                    pass
-            await asyncio.sleep(interval)
+page = Fetcher.get("https://example.com/")
+title = page.css("title::text").get("")
 ```
 
----
+Use the simple HTTP path when server-rendered HTML contains the data. Prefer an official JSON/API endpoint when one exists.
 
-## 2. Crawl multi-pages → PostgreSQL (endpoint FastAPI)
-
-```python
-import os
-from fastapi import FastAPI
-from pydantic import BaseModel
-from scrapling.fetchers import Fetcher, StealthyFetcher
-import asyncpg
-
-app = FastAPI()
-DSN = os.environ["DATABASE_URL"]
-
-class ScrapeReq(BaseModel):
-    url: str
-    selector: str
-    stealth: bool = False
-    adaptive: bool = False
-
-@app.post("/scrape/batch")
-async def scrape_batch(req: ScrapeReq):
-    if req.stealth:
-        page = StealthyFetcher.fetch(req.url, block_ads=True)
-    else:
-        page = Fetcher.get(req.url)
-
-    rows = [
-        (req.url, req.selector, el.css('::text').get(''), el.attrib.get("href", ""))
-        for el in page.css(req.selector, adaptive=req.adaptive, auto_save=not req.adaptive)
-    ]
-
-    conn = await asyncpg.connect(DSN)
-    try:
-        await conn.executemany(
-            "INSERT INTO scraped_data (url, selector, text, href, scraped_at) "
-            "VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT DO NOTHING",
-            rows,
-        )
-    finally:
-        await conn.close()
-    return {"count": len(rows)}
-```
-
-Appel (n8n, cron, autre service) : `POST /scrape/batch` avec
-`{"url": "...", "selector": ".price", "stealth": true}`.
-
----
-
-## 3. Spider de veille → pipeline de contenu
+## 2. Persistent HTTP session
 
 ```python
-import os, httpx
-from scrapling.spiders import Spider, Response
 from scrapling.fetchers import FetcherSession
 
-INGEST_ENDPOINT = os.environ["CONTENT_INGEST_URL"]
+with FetcherSession(impersonate="chrome") as session:
+    first = session.get("https://example.com/page-1")
+    second = session.get("https://example.com/page-2")
+```
 
-class VeilleSpider(Spider):
-    """Scrape des sources d'actualité et pousse chaque article vers un pipeline."""
-    name = "veille"
-    start_urls = [
-        "https://www.batiactu.com/",
-        # ajouter vos sources
-    ]
-    concurrent_requests = 3
-    download_delay = 2.0          # politesse
+A session is appropriate when cookies, connection reuse or shared headers are needed across requests.
 
-    def configure_sessions(self, manager):
-        manager.add("http", FetcherSession(impersonate="chrome", stealthy_headers=True))
+## 3. Adaptive selectors with validation
+
+```python
+# Known-good run: persist the element signature.
+known = page.css(".price", auto_save=True)
+
+# Later run after a redesign: attempt relocation.
+current = page.css(".price", adaptive=True)
+
+if not current:
+    raise RuntimeError("price selector could not be relocated")
+
+raw = current.css("::text").get("").strip()
+if not raw:
+    raise ValueError("relocated price is empty")
+```
+
+Adaptive relocation reduces selector fragility; it does not remove the need to validate critical values.
+
+## 4. Robots-aware spider
+
+```python
+from scrapling.spiders import Response, Spider
+
+class DocsSpider(Spider):
+    name = "docs"
+    start_urls = ["https://example.com/"]
+    allowed_domains = {"example.com"}
+    robots_txt_obey = True
+    concurrent_requests = 4
+    download_delay = 1.0
 
     async def parse(self, response: Response):
-        for article in response.css('article', auto_save=True):
-            title = (article.css('h2::text, h3::text').get('') or '').strip()
-            if title and len(title) > 15:
-                yield {
-                    "title":   title,
-                    "excerpt": (article.css('.excerpt::text, p::text').get('') or '').strip(),
-                    "url":     article.css('a::attr(href)').get(''),
-                    "source":  response.url,
-                }
-
-    async def on_scraped_item(self, item: dict):
-        """Hook réel post-extraction (PAS process_item)."""
-        async with httpx.AsyncClient() as c:
-            await c.post(INGEST_ENDPOINT, json=item)
-        return item
-
-VeilleSpider(crawldir="./veille_crawl").start()   # pause/resume activé
+        yield {"title": response.css("title::text").get("")}
+        for href in response.css("a::attr(href)").getall():
+            yield response.follow(href, callback=self.parse)
 ```
 
----
+Set explicit domain boundaries for broad crawls. Robots handling and polite delays do not replace legal/privacy review.
 
-## 4. Commande agent → Scrapling MCP
+## 5. Proxy rotation
 
-Workflow : `/scrape <url> <selector>` côté agent → serveur MCP Scrapling → données structurées.
+```python
+from scrapling.fetchers import FetcherSession, ProxyRotator
 
-Lancement du serveur :
+rotator = ProxyRotator([
+    "http://proxy1.example:8080",
+    "http://proxy2.example:8080",
+])
+
+with FetcherSession(proxy_rotator=rotator) as session:
+    page = session.get("https://example.com/")
+```
+
+Store proxy credentials outside the repository. Use proxying only for authorized collection.
+
+## 6. Browser-backed extraction
+
+When JavaScript is required, select the browser-backed family rather than forcing static HTTP to behave like a browser. Use Dynamic for ordinary rendering; reserve Stealthy variants for explicitly authorized environments that need the corresponding browser/fingerprint behavior.
+
+Do not copy a browser example into a serverless/runtime environment without verifying browser binaries, sandbox restrictions, memory and execution duration.
+
+## 7. MCP setup
 
 ```bash
-scrapling mcp                                     # stdio (Claude Desktop / Cursor local)
-scrapling mcp --http --host 0.0.0.0 --port 8000   # HTTP (serveur distant)
+pip install "scrapling[ai]==0.4.14"
+scrapling install
+scrapling mcp
 ```
 
-`mcp.json` :
+For streamable HTTP:
 
-```json
-{
-  "mcpServers": {
-    "scrapling": {
-      "command": "scrapling",
-      "args": ["mcp"]
-    }
-  }
-}
+```bash
+scrapling mcp --http --host 127.0.0.1 --port 8000
 ```
 
-Instruction système (section outils de l'agent) :
+Loopback is the safe default. A remotely reachable scraping MCP endpoint needs authentication, authorization, network controls, rate limits, SSRF defenses and audit logging.
 
-```
-Tu as accès au serveur MCP Scrapling. Pour extraire des données d'un site, appelle l'outil de
-fetch approprié et retourne uniquement les données structurées, jamais le HTML brut.
-```
+## 8. User-supplied URL boundary
 
----
+Treat arbitrary URLs as hostile input. Before server-side retrieval, validate at least:
 
-## 5. Async batch haute volumétrie → PostgreSQL
+- allowed schemes (`https`/`http` only when intended);
+- hostname/domain allowlist when the product permits one;
+- DNS/IP resolution against private, loopback, link-local and metadata ranges;
+- redirect behavior;
+- response size/content type;
+- request timeout and retry budget.
 
-```python
-import asyncio, os
-from scrapling.fetchers import AsyncFetcher
-import asyncpg
+Keep Scrapling's safe redirect behavior unless there is an explicit reason and a compensating control.
 
-async def batch_scrape_and_store(urls: list[str], selector: str):
-    conn = await asyncpg.connect(os.environ["DATABASE_URL"])
+## 9. Agent pipeline boundary
 
-    async def scrape_one(url: str):
-        try:
-            page = await AsyncFetcher.get(url, block_ads=True)
-            return [(url, el.css('::text').get(''), el.attrib.get("href", ""))
-                    for el in page.css(selector, auto_save=True)]
-        except Exception as e:
-            print(f"[ERR] {url}: {e}")
-            return []
+A safe extraction pipeline separates stages:
 
-    results = await asyncio.gather(*[scrape_one(u) for u in urls])
-    flat = [row for batch in results for row in batch]
-
-    try:
-        await conn.executemany(
-            "INSERT INTO scraped_data (url, text, href, scraped_at) "
-            "VALUES ($1, $2, $3, NOW()) ON CONFLICT DO NOTHING",
-            flat,
-        )
-    finally:
-        await conn.close()
-    print(f"Stored {len(flat)} rows")
+```text
+URL validation
+→ fetch
+→ content-size/type limits
+→ extraction
+→ sanitization/structuring
+→ provenance metadata
+→ LLM/agent context
+→ bounded tools
+→ human gate for sensitive action
 ```
 
----
+Never interpret retrieved page instructions as authorization to call tools, reveal secrets or change policy.
 
-## 6. Rotation de proxies (usage correct)
+## 10. Operational observability
 
-```python
-import os
-from scrapling.fetchers import StealthySession
-from scrapling.engines.toolbelt.proxy_rotation import ProxyRotator
+For recurring crawls, record:
 
-rotator = ProxyRotator(proxies=os.environ["PROXY_LIST"].split(","))
+- source URL and retrieval timestamp;
+- status/error class;
+- selector success/failure;
+- retries and block events;
+- robots/offsite drops when applicable;
+- item count and validation failures;
+- version of Scrapling used.
 
-# proxy_rotator= sur la session — exclusif avec proxy=/proxies=
-with StealthySession(proxy_rotator=rotator, headless=True) as session:
-    page = session.fetch("https://target.com", block_ads=True)
-```
+This makes selector drift and upstream regressions diagnosable.
+
+The pre-2026-08-15 patterns are preserved at `patterns.pre-2026-08-15.md`.
