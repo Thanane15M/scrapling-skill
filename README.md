@@ -1,10 +1,10 @@
 # scrapling-skill
 
-Version-aware Agent Skill for [Scrapling](https://github.com/D4Vinci/Scrapling), focused on adaptive web extraction, fetcher/session selection, spiders, proxy rotation, robots-aware crawling and MCP integration.
+Version-aware Agent Skill for [Scrapling](https://github.com/D4Vinci/Scrapling), focused on adaptive web extraction, RAG Markdown generation, fetcher/session selection, spiders, proxy rotation, robots-aware crawling and MCP integration.
 
 ## Current compatibility target
 
-**Scrapling 0.4.14** — last repository evidence review: **2026-08-15**.
+**Scrapling 0.4.15** — last repository evidence review: **2026-09-04**.
 
 The compatibility target is machine-readable in `UPSTREAM_VERSION`. A scheduled GitHub Actions check detects when PyPI publishes a different latest version so the repository cannot silently stay “verified” forever.
 
@@ -23,7 +23,7 @@ A successful import is not proof that every target website, anti-bot flow or bro
 
 | Path | Purpose |
 |---|---|
-| `SKILL.md` | concise agent-facing decision workflow |
+| `SKILL.md` | concise agent-facing decision workflow (RAG, fetchers, MCP, safety) |
 | `references/patterns.md` | implementation patterns for the pinned upstream line |
 | `evals/cases.jsonl` | behavioral evaluation cases |
 | `scripts/verify_upstream.py` | installed API compatibility checks |

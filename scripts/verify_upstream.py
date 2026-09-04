@@ -32,7 +32,7 @@ def main() -> int:
         StealthyFetcher,
         StealthySession,
     )
-    from scrapling.spiders import Response, Spider
+    from scrapling.spiders import Response, SiteToMarkdownSpider, Spider
 
     symbols = {
         "Fetcher": Fetcher,
@@ -47,6 +47,7 @@ def main() -> int:
         "ProxyRotator": ProxyRotator,
         "Spider": Spider,
         "Response": Response,
+        "SiteToMarkdownSpider": SiteToMarkdownSpider,
     }
     require(all(symbols.values()), "one or more documented symbols are unavailable")
 
@@ -60,11 +61,23 @@ def main() -> int:
     require(hasattr(Spider, "robots_txt_obey"), "Spider lost robots_txt_obey")
     require(hasattr(Fetcher, "get"), "Fetcher.get is unavailable")
 
+    # Scrapling 0.4.15 RAG markdown and tab lifecycle verification
+    require(hasattr(Response, "markdown"), "Response lost markdown method")
+    markdown_params = inspect.signature(Response.markdown).parameters
+    require("main_content_only" in markdown_params, "Response.markdown lost main_content_only parameter")
+    require("css_selector" in markdown_params, "Response.markdown lost css_selector parameter")
+
+    require(hasattr(DynamicSession, "close_pages"), "DynamicSession lost close_pages method")
+    require(hasattr(StealthySession, "close_pages"), "StealthySession lost close_pages method")
+
     try:
         from scrapling.core.ai import ScraplingMCPServer
     except Exception as exc:  # pragma: no cover - provides a useful CI failure
         raise AssertionError(f"MCP server import failed: {exc}") from exc
     require(ScraplingMCPServer is not None, "ScraplingMCPServer unavailable")
+    require(hasattr(ScraplingMCPServer, "make_request"), "ScraplingMCPServer lost make_request")
+    require(hasattr(ScraplingMCPServer, "session_fetch"), "ScraplingMCPServer lost session_fetch")
+    require(hasattr(ScraplingMCPServer, "open_request_session"), "ScraplingMCPServer lost open_request_session")
 
     print(f"Scrapling API surface verified for {installed}: {', '.join(symbols)}")
     return 0
