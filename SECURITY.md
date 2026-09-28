@@ -28,3 +28,4 @@ Use GitHub's private security reporting mechanism when available. Do not publish
 - Historical `*.pre-2026-08-15.md` snapshots are preserved byte-for-byte as evidence of the previous public state and excluded from active-example validation; they are not current guidance.
 - Repository-level GitHub secret scanning/push protection should remain enabled when available because it covers the whole history independently of the active-doc validator.
 - Upstream compatibility is pinned and re-checked; a new release invalidates an unqualified “verified latest” claim until reviewed.
+- MCP black-box CI pins MCP Inspector to an exact package version, runs with `contents: read`, receives no repository secrets, targets only the local stdio Scrapling server, and must be reviewed before any Inspector version change.
