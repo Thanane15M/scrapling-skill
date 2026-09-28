@@ -25,7 +25,8 @@ Pinned upstream version: **Scrapling 0.4.15**.
 - Building RAG systems: `https://scrapling.readthedocs.io/en/latest/ai/building-rag-systems.html`
 - Proxy rotation: `https://scrapling.readthedocs.io/en/latest/api-reference/proxy-rotation.html`
 - Spider robots behavior: `https://scrapling.readthedocs.io/en/latest/spiders/getting-started.html`
-- MCP server breaking changes: `https://scrapling.readthedocs.io/en/latest/ai/mcp-server.html#breaking-changes`\n- MCP Inspector 2.8.0 release: `https://github.com/modelcontextprotocol/inspector/releases/tag/2.8.0`
+- MCP server breaking changes: `https://scrapling.readthedocs.io/en/latest/ai/mcp-server.html#breaking-changes`
+- MCP Inspector 2.8.0 release: `https://github.com/modelcontextprotocol/inspector/releases/tag/2.8.0`
 
 ## Re-verification triggers
 
@@ -35,7 +36,8 @@ Compatibility returns to `NOT_PROVEN` until checked when:
 - documented import paths or signatures change;
 - Spider lifecycle or adaptive-selector behavior changes;
 - MCP transport/CLI flags change;
-- security-relevant defaults such as redirect handling change;\n- the pinned MCP Inspector version or MCP protocol-era behavior changes.
+- security-relevant defaults such as redirect handling change;
+- the pinned MCP Inspector version or MCP protocol-era behavior changes.
 
 ## Evidence vocabulary
 
