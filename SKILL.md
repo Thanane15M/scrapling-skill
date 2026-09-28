@@ -190,7 +190,8 @@ Before relying on a code example:
 2. install `requirements-dev.txt`;
 3. run `python scripts/verify_upstream.py`;
 4. inspect `VERIFICATION.md` for the last checked upstream version;
-5. if `UPSTREAM_VERSION` differs from the installed/latest release, classify compatibility as `NOT_PROVEN` until re-verified.
+5. for MCP compatibility, require a green `MCP black-box` CI run (Inspector 2.8.0 over local stdio) rather than inferring protocol compatibility from imports alone;
+6. if `UPSTREAM_VERSION` differs from the installed/latest release, classify compatibility as `NOT_PROVEN` until re-verified.
 
 ## References
 
