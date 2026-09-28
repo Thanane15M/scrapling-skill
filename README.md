@@ -15,6 +15,7 @@ This repository separates four kinds of proof:
 - **Documentation verification** — current upstream docs/release are referenced in `VERIFICATION.md`.
 - **Static validation** — skill frontmatter, local links, eval JSONL, fenced Python syntax and obvious secret patterns.
 - **API-surface verification** — CI installs the pinned Scrapling version and introspects the imports/signatures used by this skill.
+- **MCP black-box verification** — a separate least-privilege CI job uses MCP Inspector 2.8.0 over local stdio to initialize the pinned Scrapling MCP server and verify its documented tool surface.
 - **Runtime/browser behavior** — remains `NOT_PROVEN` unless a test actually launches the relevant browser/network flow in an authorized environment.
 
 A successful import is not proof that every target website, anti-bot flow or browser environment will work.
