@@ -4,13 +4,13 @@ Version-aware Agent Skill for [Scrapling](https://github.com/D4Vinci/Scrapling),
 
 ## Current compatibility target
 
-**Scrapling 0.4.15** — last repository evidence review: **2026-09-04**.
+**Scrapling 0.4.15** — last repository evidence review: **2026-09-28**.
 
 The compatibility target is machine-readable in `UPSTREAM_VERSION`. A scheduled GitHub Actions check detects when PyPI publishes a different latest version so the repository cannot silently stay “verified” forever.
 
 ## Quality model
 
-This repository separates four kinds of proof:
+This repository separates five kinds of proof:
 
 - **Documentation verification** — current upstream docs/release are referenced in `VERIFICATION.md`.
 - **Static validation** — skill frontmatter, local links, eval JSONL, fenced Python syntax and obvious secret patterns.
