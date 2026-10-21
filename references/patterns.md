@@ -1,196 +1,132 @@
-# Scrapling integration patterns — pinned to 0.4.15
+# Scrapling v0.5 integration patterns
 
-These examples are intentionally generic and secret-free. Re-run `scripts/verify_upstream.py` before using them with a different Scrapling version.
+All code assumes upstream **0.5**. For breaking changes use
+[migration-v0.5.md](migration-v0.5.md).
 
-## 1. Fast HTTP extraction
+## HTTP static extraction
 
-```python
+~~~python
 from scrapling.fetchers import Fetcher
 
 page = Fetcher.get("https://example.com/")
-title = page.css("title::text").get("")
-```
+title = page.css("title::text").get("").strip()
+if not title:
+    raise ValueError("missing title")
+record = {"url": page.url, "title": title}
+~~~
 
-Use the simple HTTP path when server-rendered HTML contains the data. Prefer an official JSON/API endpoint when one exists.
+Prefer documented APIs when they satisfy the request.
 
-## 2. LLM-ready Markdown extraction (RAG)
+## Markdown for a sourced article or RAG record
 
-```python
+~~~python
 from scrapling.fetchers import Fetcher
 
-page = Fetcher.get("https://example.com/docs")
-# Strips scripts, styles, and hidden prompt-injection vectors automatically
+page = Fetcher.get("https://example.com/article")
 markdown = page.markdown(main_content_only=True)
-```
+selected = page.markdown(css_selector="article")
+~~~
 
-Pass `css_selector="article.content"` to limit extraction to a specific container:
+Hidden-content stripping is not a security boundary for tool execution.
+Preserve URL/time provenance and verify factual attribution.
 
-```python
-article_md = page.markdown(css_selector="article.content")
-```
+## Shared HTTP state / optional proxies
 
-## 3. Persistent HTTP session
+~~~python
+from scrapling.fetchers import FetcherSession, ProxyRotator
 
-```python
-from scrapling.fetchers import FetcherSession
+rotator = ProxyRotator(["http://proxy.example:8080"])
+with FetcherSession(proxy_rotator=rotator) as session:
+    page = session.get("https://example.com/")
+~~~
 
-with FetcherSession(impersonate="chrome") as session:
-    first = session.get("https://example.com/page-1")
-    second = session.get("https://example.com/page-2")
-```
+Keep credentials outside code. Rotate only where legitimate and permitted.
 
-A session is appropriate when cookies, connection reuse or shared headers are needed across requests.
+## Adaptive selectors with semantic checks
 
-## 4. Adaptive selectors with validation
+~~~python
+from scrapling.fetchers import Fetcher
 
-```python
-# Known-good run: persist the element signature.
-known = page.css(".price", auto_save=True)
-
-# Later run after a redesign: attempt relocation.
+page = Fetcher.get("https://example.com/catalogue")
+page.css(".price", auto_save=True)
 current = page.css(".price", adaptive=True)
-
 if not current:
-    raise RuntimeError("price selector could not be relocated")
-
+    raise ValueError("selector drift: no price")
 raw = current.css("::text").get("").strip()
 if not raw:
-    raise ValueError("relocated price is empty")
-```
+    raise ValueError("relocated price empty")
+# Validate expected currency, locale, numeric range and source.
+~~~
 
-Adaptive relocation reduces selector fragility; it does not remove the need to validate critical values.
+## Patchright browser and network API capture
 
-## 5. Robots-aware spider
+~~~python
+from scrapling.fetchers import StealthySession
 
-```python
-from scrapling.spiders import Response, Spider
+with StealthySession(record_requests=True) as session:
+    page = session.fetch("https://example.com/app", network_idle=True)
+    for response in session.network.search(url_pattern=r"/api/", limit=None):
+        print(response.url, response.status)
+    session.close_pages()
+~~~
 
-class DocsSpider(Spider):
+Network recordings may include PII; protect retention and tool scopes.
+History caps mean absence of a body is not absence of a request.
+
+## Documentation corpus via ContentSpider
+
+~~~python
+from scrapling.spiders import ContentSpider
+
+class DocsSpider(ContentSpider):
     name = "docs"
-    start_urls = ["https://example.com/"]
+    start_urls = ["https://example.com/docs/"]
     allowed_domains = {"example.com"}
     robots_txt_obey = True
+    max_pages = 100
+    output_dir = "corpus"
     concurrent_requests = 4
     download_delay = 1.0
 
+result = DocsSpider().start()
+result.items.to_jsonl("corpus.jsonl")
+~~~
+
+Robots errors can block the domain in 0.5: report blocked, not empty success.
+
+## v0.5 follow() request semantics
+
+~~~python
+from scrapling.spiders import Response, Spider
+
+class PagesSpider(Spider):
+    name = "pages"
+    start_urls = ["https://example.com/"]
+
     async def parse(self, response: Response):
-        yield {"title": response.css("title::text").get("")}
         for href in response.css("a::attr(href)").getall():
             yield response.follow(href, callback=self.parse)
-```
+        # For POST pagination explicitly pass method and body:
+        # yield response.follow("/next", method="POST", json={"page": 2})
+~~~
 
-Set explicit domain boundaries for broad crawls. Robots handling and polite delays do not replace legal/privacy review.
+## MCP and CLI
 
-## 6. Website-to-Markdown corpus spider (RAG)
-
-```python
-from scrapling.spiders import SiteToMarkdownSpider
-
-class CorpusSpider(SiteToMarkdownSpider):
-    name = "corpus"
-    start_urls = ["https://example.com/kb/"]
-    allowed_domains = {"example.com"}
-    output_dir = "scraped_docs"
-    max_pages = 100
-
-result = CorpusSpider().start()
-result.items.to_jsonl("corpus.jsonl")
-```
-
-`SiteToMarkdownSpider` yields items with `url`, `title`, and `markdown`, writing Markdown files to `output_dir`.
-
-## 7. Proxy rotation
-
-```python
-from scrapling.fetchers import FetcherSession, ProxyRotator
-
-rotator = ProxyRotator([
-    "http://proxy1.example:8080",
-    "http://proxy2.example:8080",
-])
-
-with FetcherSession(proxy_rotator=rotator) as session:
-    page = session.get("https://example.com/")
-```
-
-Store proxy credentials outside the repository. Use proxying only for authorized collection.
-
-## 8. Browser-backed extraction and tab management
-
-When JavaScript is required, select the browser-backed family rather than forcing static HTTP to behave like a browser. Use Dynamic for ordinary rendering; reserve Stealthy variants for explicitly authorized environments that need the corresponding browser/fingerprint behavior.
-
-Tabs remain open and are reused across requests for performance:
-
-```python
-from scrapling.fetchers import DynamicSession
-
-with DynamicSession() as session:
-    page1 = session.fetch("https://example.com/app#view1")
-    page2 = session.fetch("https://example.com/app#view2")
-    session.close_pages()
-```
-
-Do not copy a browser example into a serverless/runtime environment without verifying browser binaries, sandbox restrictions, memory and execution duration.
-
-## 9. MCP setup (v0.4.15)
-
-```bash
-pip install "scrapling[ai]==0.4.15"
+~~~bash
+python -m pip install "scrapling[ai]==0.5"
 scrapling install
 scrapling mcp
-```
+scrapling extract get "https://example.com/article" article.md --ai-targeted
+scrapling extract fetch "https://example.com/app" page.md --ai-targeted
+~~~
 
-For streamable HTTP with mandatory authentication:
+For browser MCP: browser_open → browser_fetch → browser_extract / actions
+→ browser_screenshot → close_session. Discover names with tools/list.
+Legacy bulk tools are removed, screenshot does not navigate.
 
-```bash
-scrapling mcp --http --host 127.0.0.1 --port 8000 --auth-token "$SCRAPLING_MCP_AUTH_TOKEN"
-```
+## Untrusted URL operational boundary
 
-Loopback is the safe default. A remotely reachable scraping MCP endpoint needs authentication, authorization, network controls, rate limits, SSRF defenses and audit logging.
-
-## 10. User-supplied URL boundary
-
-Treat arbitrary URLs as hostile input. Before server-side retrieval, validate at least:
-
-- allowed schemes (`https`/`http` only when intended);
-- hostname/domain allowlist when the product permits one;
-- DNS/IP resolution against private, loopback, link-local and metadata ranges;
-- redirect behavior;
-- response size/content type;
-- request timeout and retry budget.
-
-Keep Scrapling's safe redirect behavior unless there is an explicit reason and a compensating control.
-
-## 11. Agent pipeline boundary
-
-A safe extraction pipeline separates stages:
-
-```text
-URL validation
-→ fetch
-→ content-size/type limits
-→ extraction / markdown conversion
-→ sanitization/structuring
-→ provenance metadata
-→ LLM/agent context
-→ bounded tools
-→ human gate for sensitive action
-```
-
-Never interpret retrieved page instructions as authorization to call tools, reveal secrets or change policy.
-
-## 12. Operational observability
-
-For recurring crawls, record:
-
-- source URL and retrieval timestamp;
-- status/error class;
-- selector success/failure;
-- retries and block events;
-- robots/offsite drops when applicable;
-- item count and validation failures;
-- version of Scrapling used.
-
-This makes selector drift and upstream regressions diagnosable.
-
-The pre-2026-08-15 patterns are preserved at `patterns.pre-2026-08-15.md`.
+Input URL → scheme/host allowlist → DNS/IP/redirect guard (SSRF) →
+request budget → content-type and byte limits → extraction → typed validation
+→ source receipt → untrusted agent context → human gate for consequential
+actions. Log error class, selector yield, source URL and actual dependency.
