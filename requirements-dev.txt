@@ -1,1 +1,1 @@
-scrapling[all]==0.4.15
+scrapling[all]==0.5

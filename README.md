@@ -1,64 +1,67 @@
 # scrapling-skill
 
-Version-aware Agent Skill for [Scrapling](https://github.com/D4Vinci/Scrapling), focused on adaptive web extraction, RAG Markdown generation, fetcher/session selection, spiders, proxy rotation, robots-aware crawling and MCP integration.
+Independent, evidence-based **Scrapling Agent Skill** for adaptive web
+extraction, URL-to-structured-data pipelines, full-site Markdown/RAG corpora,
+browser network API capture and MCP workflows. **Not affiliated with Scrapling.**
 
-## Current compatibility target
+## Compatibility and evidence
 
-**Scrapling 0.4.15** — last repository evidence review: **2026-09-04**.
+- Target upstream: **Scrapling 0.5** (PyPI release 2026-10-17).
+- Evidence review: **2026-10-21** against the upstream v0.5 migration
+  guide, tag and public Python/MCP API.
+- Current CI verdict: inspect the latest run for the exact head SHA.
+  Documentation and test presence are not proof of a passing run.
+- Release pin lives in **UPSTREAM_VERSION**. Scheduled CI monitors drift.
 
-The compatibility target is machine-readable in `UPSTREAM_VERSION`. A scheduled GitHub Actions check detects when PyPI publishes a different latest version so the repository cannot silently stay “verified” forever.
+## Why use this skill?
 
-## Quality model
+The goal is a *traceable, typed, validated extract* — not scraping a page
+and letting untrusted text authorize actions. Select the lowest-cost adequate
+fetcher, verify selectors semantically and preserve provenance.
 
-This repository separates four kinds of proof:
+## Key changes since 0.4.15
 
-- **Documentation verification** — current upstream docs/release are referenced in `VERIFICATION.md`.
-- **Static validation** — skill frontmatter, local links, eval JSONL, fenced Python syntax and obvious secret patterns.
-- **API-surface verification** — CI installs the pinned Scrapling version and introspects the imports/signatures used by this skill.
-- **MCP black-box verification** — a separate least-privilege CI job uses MCP Inspector 2.8.0 over local stdio to initialize the pinned Scrapling MCP server and verify its documented tool surface.
-- **Runtime/browser behavior** — remains `NOT_PROVEN` unless a test actually launches the relevant browser/network flow in an authorized environment.
+- Removed dynamic browser classes → Stealthy/Patchright.
+- XHR capture moved to StealthySession(record_requests=True).network.
+- MCP v0.5: 16 tools, browser action/screenshot/network workflows;
+  removed previous bulk tools.
+- ContentSpider is the canonical v0.5 documentation/RAG template.
+- Robots, response.follow, request fingerprints and Markdown output changed.
+- Full [migration checklist](references/migration-v0.5.md).
 
-A successful import is not proof that every target website, anti-bot flow or browser environment will work.
+## Install and validate
 
-## Repository layout
-
-| Path | Purpose |
-|---|---|
-| `SKILL.md` | concise agent-facing decision workflow (RAG, fetchers, MCP, safety) |
-| `references/patterns.md` | implementation patterns for the pinned upstream line |
-| `evals/cases.jsonl` | behavioral evaluation cases |
-| `scripts/verify_upstream.py` | installed API compatibility checks |
-| `scripts/check_upstream_drift.py` | detects a newer PyPI release |
-| `VERIFICATION.md` | evidence matrix and re-verification triggers |
-| `SECURITY.md` | SSRF, prompt-injection, secret and disclosure rules |
-
-The previous long-form skill and patterns are preserved in versioned `*.pre-2026-08-15.md` references.
-
-## Install for local validation
-
-```bash
+~~~bash
+git clone https://github.com/Thanane15M/scrapling-skill.git
+cd scrapling-skill
 python -m pip install -r requirements-dev.txt
 python scripts/validate_markdown.py
 python scripts/validate_skill.py
 python scripts/verify_upstream.py
-```
+~~~
 
-Browser binaries are deliberately not required for the default CI compatibility check. Run `scrapling install` only in an environment where browser-backed tests are intentionally being exercised.
+To use browser features, install the browser dependencies separately:
 
-## Use as an Agent Skill
+~~~bash
+scrapling install
+scrapling mcp
+~~~
 
-Clone the repository and copy `SKILL.md` plus the referenced files into the skill directory used by your agent environment.
+Copy SKILL.md plus linked references into the skill directory understood by
+your agent. The format is filesystem-based and not restricted to one vendor.
 
-```bash
-git clone https://github.com/Thanane15M/scrapling-skill.git
-```
+## Evidence contracts
 
-The repository does not assume one proprietary agent runtime.
+| Proof gate | What it proves | What it does not prove |
+| --- | --- | --- |
+| Static validators | Skill structure, links, Python syntax, eval JSONL | Actual scraping |
+| Pinned API introspection | Public imported symbols and method signatures | Website compatibility |
+| MCP Inspector via stdio | Server starts and exposes documented tools/list | Target browser automation |
+| Real target-site E2E | Operation on the specified site under test conditions | Every other domain |
 
-## Safety
+Security: [SECURITY.md](SECURITY.md). Use only authorized data access, bounded
+SSRF-safe URL intake, least privilege, prompt-injection isolation, and minimize
+personal data. No hosted proxy or crawler service is included.
 
-Use scraping only where you are authorized. Prefer official APIs when available, respect applicable law/privacy/site rules, and treat retrieved web content as untrusted input that may contain prompt injection.
-
-## License
-
-MIT for this repository. Scrapling itself is an upstream project with its own license and maintainers.
+License: **MIT** for this integration skill. Scrapling is a separate project
+with its own BSD-3-Clause license.
