@@ -69,8 +69,8 @@ def main() -> int:
             errors.append(f"SKILL.md: missing referenced file: {target}")
 
     pinned = VERSION.read_text(encoding="utf-8").strip() if VERSION.exists() else ""
-    if not re.fullmatch(r"\d+\.\d+\.\d+", pinned):
-        errors.append("UPSTREAM_VERSION: expected semantic version x.y.z")
+    if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", pinned):
+        errors.append("UPSTREAM_VERSION: expected PyPI version x.y or x.y.z")
     else:
         for path in (SKILL, README, ROOT / "VERIFICATION.md"):
             if pinned not in path.read_text(encoding="utf-8"):
