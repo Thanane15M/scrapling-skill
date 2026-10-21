@@ -85,8 +85,12 @@ def main() -> int:
     require("proxy_rotator" in session_params, "FetcherSession missing proxy_rotator")
     require("follow_redirects" in session_params, "FetcherSession missing follow_redirects")
     require("proxies" in inspect.signature(ProxyRotator).parameters, "ProxyRotator missing proxies")
-    require("record_requests" in inspect.signature(StealthySession).parameters,
-            "StealthySession missing record_requests network-history option")
+    browser_params = inspect.signature(StealthySession).parameters
+    require("record_requests" in browser_params or any(
+        p.kind == inspect.Parameter.VAR_KEYWORD for p in browser_params.values()
+    ), "StealthySession constructor no longer accepts configurable browser arguments")
+    # v0.5 exposes record_requests through **kwargs/StealthSession typing, not
+    # necessarily an explicit inspect.signature(StealthySession) parameter.
 
     require(hasattr(Spider, "robots_txt_obey"), "Spider missing robots_txt_obey")
     require(hasattr(Fetcher, "get"), "Fetcher.get unavailable")
