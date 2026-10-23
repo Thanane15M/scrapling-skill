@@ -12,3 +12,11 @@ __pycache__/
 *.pyc
 .venv/
 .env
+
+# Local Recall memory - do not commit private databases
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+private/

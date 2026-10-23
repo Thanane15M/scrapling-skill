@@ -5,7 +5,8 @@ description: >
   browser fetching, adaptive selectors, ContentSpider RAG Markdown, recorded
   browser API traffic, MCP browser actions, and migration from v0.4.x. Use
   for scraping tasks, source-URL content pipelines, RAG corpora, website change
-  resilience, MCP integration, browser API capture, or diagnosing version drift.
+  resilience, MCP integration, browser API capture, version drift, or opt-in
+  local extraction memory with provenance and change classification.
 ---
 
 # Scrapling — evidence-based extraction (upstream 0.5)
@@ -87,6 +88,39 @@ On a known-good page, save the selector signature with auto_save=True; then
 try adaptive=True after markup changes. Verify currency, numeric range,
 required attributes, duplicates and source provenance. Auto-relocation
 alone does not prove the selected element is correct.
+
+
+## Optional Scrapling Recall — narrow local memory (preview)
+
+**This is independent companion code, not a built-in Scrapling feature.**
+Upstream already remembers DOM selector properties in its adaptive SQLite
+store and supports crawler checkpoints: do not duplicate either mechanism.
+Our [memory companion](references/memory.md) adds an opt-in, stdlib-only
+SQLite ledger of *operator-attested* extraction recipes, business-field
+snapshots, version/digest provenance, and six change states:
+`new`, `unchanged`, `changed`, `moved`, `missing`, `uncertain`.
+
+Select a private `--db` path and a project `--namespace`. The module **never
+fetches URLs**, schedules jobs, or executes untrusted page instructions.
+The user/caller must validate fetch success and semantics before passing
+`observe --validated`; otherwise the observation is `uncertain`, never
+an overwriting trusted snapshot. A single missed entity never causes deletion.
+A second *distinct complete run* with a unique `--run-id` is required for
+confirmed missing status. No automatic deletion even after confirmation.
+
+~~~bash
+python runtime/scrapling_memory.py --db ./private/recall.sqlite \
+  --namespace demo observe --url https://example.org/product/42 \
+  --file extraction.json --extractor catalogue-v1 --validated
+python -m unittest discover -s tests -p 'test_scrapling_memory.py'
+~~~
+
+Treat recorded robot/terms statuses as **caller-reported**, not compliance
+verification. Storage is plaintext: reject secrets, minimize PII and never
+commit `*.sqlite`. Expire and revalidate extraction profiles; keep histories
+isolated by host and namespace. [Memory reference](references/memory.md)
+and [STORM evidence synthesis](references/storm-memory-evidence-2026-10-23.md)
+describe limits and the missing 3-site live benchmark.
 
 ## MCP v0.5 — do not use old tool names
 
