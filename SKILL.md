@@ -5,7 +5,8 @@ description: >
   browser fetching, adaptive selectors, ContentSpider RAG Markdown, recorded
   browser API traffic, MCP browser actions, and migration from v0.4.x. Use
   for scraping tasks, source-URL content pipelines, RAG corpora, website change
-  resilience, MCP integration, browser API capture, version drift, or opt-in\n  local extraction memory with provenance and change classification.
+  resilience, MCP integration, browser API capture, version drift, or opt-in
+  local extraction memory with provenance and change classification.
 ---
 
 # Scrapling — evidence-based extraction (upstream 0.5)
