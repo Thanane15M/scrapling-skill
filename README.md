@@ -1,4 +1,7 @@
-# scrapling-skill
+# Scrapling Recall — evidence-first extraction skill
+
+![Scrapling Recall independent mark](assets/scrapling-recall-mark.svg)
+
 
 Independent, evidence-based **Scrapling Agent Skill** for adaptive web
 extraction, URL-to-structured-data pipelines, full-site Markdown/RAG corpora,
