@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -23,6 +24,7 @@ FILES = (
     "references/memory.md",
     "references/storm-memory-evidence-2026-10-23.md",
     "runtime/scrapling_memory.py",
+    "assets/scrapling-recall-mark.svg",
 )
 REMOVED_LINKS = (
     "evals/cases.jsonl",
@@ -70,6 +72,8 @@ def build(output: Path) -> None:
             raise FileNotFoundError(f"missing or symlinked package file: {name}")
         if name != "SKILL.md":
             contents[name] = source.read_bytes()
+
+    ET.fromstring(contents["assets/scrapling-recall-mark.svg"])
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with ZipFile(output, "w", ZIP_DEFLATED) as archive:
