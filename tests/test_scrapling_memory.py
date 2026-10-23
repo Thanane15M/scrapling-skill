@@ -2,7 +2,9 @@
 
 No websites, browser, credentials, or private infrastructure are accessed.
 """
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import tempfile
@@ -152,6 +154,26 @@ class RecallTests(unittest.TestCase):
             self.assertEqual(memory.observe(self.conn, "fixtures", url, {"v": value},
                                             "test", validated=True, clock=T)["event"],
                              "changed" if index == 1 else "unchanged")
+
+    def test_cli_provenance_flags_are_caller_reported(self):
+        with tempfile.TemporaryDirectory() as temp:
+            record = Path(temp) / "record.json"
+            record.write_text('{"price":19}', encoding="utf-8")
+            db_path = Path(temp) / "proof.sqlite"
+            captured = io.StringIO()
+            with contextlib.redirect_stdout(captured):
+                code = memory.main([
+                    "--db", str(db_path), "--namespace", "sample",
+                    "observe", "--url", self.url, "--file", str(record),
+                    "--extractor", "test-cli", "--validated",
+                    "--robots-status", "checked", "--terms-status", "not_checked",
+                    "--skill-version", "memory-v0.1",
+                ])
+            self.assertEqual(code, 0)
+            receipt = json.loads(captured.getvalue())
+            self.assertEqual(receipt["provenance"]["robots_status"], "checked")
+            self.assertEqual(receipt["provenance"]["terms_status"], "not_checked")
+            self.assertEqual(receipt["review_state"], "unreviewed")
 
     def test_due_never_performs_network_requests(self):
         self.observe({"price": 1})
