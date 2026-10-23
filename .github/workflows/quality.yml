@@ -31,5 +31,7 @@ jobs:
         run: python scripts/verify_upstream.py
       - name: Test Scrapling Recall local memory
         run: python -m unittest discover -s tests -p 'test_scrapling_memory.py' -v
+      - name: Build consumer Agensi candidate ZIP (not submitted)
+        run: python scripts/build_agensi_zip.py --output "$RUNNER_TEMP/scrapling-recall-agensi-candidate.zip"
       - name: Compile scripts and opt-in runtime
         run: python -m compileall -q scripts runtime tests
