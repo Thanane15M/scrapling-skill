@@ -462,6 +462,9 @@ def main(argv: list[str] | None = None) -> int:
     o.add_argument("--extractor", required=True); o.add_argument("--validated", action="store_true")
     o.add_argument("--entity-id"); o.add_argument("--fetch-mode", choices=sorted(FETCH_MODES), default="http")
     o.add_argument("--scrapling-version", default="0.5")
+    o.add_argument("--skill-version", default="memory-v0.1")
+    o.add_argument("--robots-status", choices=sorted(EVIDENCE_STATES), default="unknown")
+    o.add_argument("--terms-status", choices=sorted(EVIDENCE_STATES), default="unknown")
     m = commands.add_parser("missing", help="record absence from a complete, valid crawl")
     m.add_argument("--url", required=True); m.add_argument("--entity-id")
     m.add_argument("--complete-run", action="store_true"); m.add_argument("--run-id")
@@ -491,7 +494,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "observe":
                 result = observe(conn, args.namespace, args.url, payload, args.extractor,
                                  entity_id=args.entity_id, validated=args.validated,
-                                 fetch_mode=args.fetch_mode, scrapling_version=args.scrapling_version)
+                                 fetch_mode=args.fetch_mode, scrapling_version=args.scrapling_version,
+                                 skill_version=args.skill_version, robots_status=args.robots_status,
+                                 terms_status=args.terms_status)
             elif args.command == "missing":
                 result = missing(conn, args.namespace, args.url, entity_id=args.entity_id,
                                  complete_run=args.complete_run, run_id=args.run_id)
