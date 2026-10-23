@@ -111,6 +111,10 @@ class RecallTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 memory.normal_url(url)
 
+    def test_benign_url_author_query_is_allowed(self):
+        normalized = memory.normal_url("https://example.org/articles?author=Gael")
+        self.assertEqual(normalized, "https://example.org/articles?author=Gael")
+
     def test_namespace_isolation_and_erasure(self):
         self.observe({"value": "left"})
         memory.observe(self.conn, "beta", self.url, {"value": "right"}, "other",
