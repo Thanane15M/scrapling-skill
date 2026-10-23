@@ -18,6 +18,12 @@ current branch passed: check exact workflow run before promoting a status.
 | Adaptive relocation guarantees correct business fields | REJECTED — semantics require validation |
 | Cleaned Markdown is safe to execute as agent instructions | REJECTED — content remains untrusted |
 | Browser works on every target website | NOT_PROVEN without authorized site/runtime E2E |
+| Recall local memory module/CLI exists on this PR branch | VERIFIED_IN_REPO, not merged |
+| Recall local event/profile logic | VERIFIED_IN_CI only after exact PR SHA tests pass |
+| Recall blocks false deletions | SUPPORTED for tested offline cases; real-site run quality NOT_PROVEN |
+| Saved robots/terms status equals compliance proof | REJECTED — caller assertion only |
+| Memory reduces latency, token spend or commercial cost | NOT_PROVEN; three owned-site benchmark required |
+| Recall is an official upstream Scrapling feature | REJECTED — independent companion |
 
 ## Authoritative references
 
@@ -45,3 +51,13 @@ upstream version, MCP protocol, Python dependencies or target changes.
 VERIFIED = source/observation supports *exact* claim; VERIFIED_IN_CI = passed
 for the *exact* commit; PARTIAL = missing material proof; NOT_PROVEN = no
 production claim; REJECTED = contradicted or insecure absolute statement.
+
+## Recall release evidence (2026-10-23)
+
+- `python -m unittest discover -s tests -p 'test_scrapling_memory.py' -v`
+  must pass for the **exact PR SHA** before release claims.
+- Offline synthetic 3 sites × 2 passes is a deterministic logic check, not
+  a browser crawl of three real sites.
+- `runtime/scrapling_memory.py` does not download data and has no hosted
+  storage, model-driven semantic search or recurring scheduler.
+- Full boundaries: [memory reference](references/memory.md).
