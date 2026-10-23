@@ -7,7 +7,6 @@ Consumer ZIP ships the runnable memory companion and a self-contained skill.
 from __future__ import annotations
 
 import argparse
-import io
 import re
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -37,17 +36,15 @@ def consumer_skill() -> str:
     for line in content.splitlines():
         if any("](" + missing + ")" in line for missing in REMOVED_LINKS):
             content = content.replace(line + "\n", "")
-    lines = content.splitlines()
-    out = []
-    in_source_qa = False
-    for line in lines:
-        # The source-only maintenance/CI scripts do not ship in the skill ZIP.
-        if line.startswith("python scripts/") or line.startswith(
-            "python -m unittest discover -s tests "
-        ):
-            continue
-        out.append(line)
-    content = "\n".join(out).rstrip() + "\n"
+    # Replace source-only QA commands by checks that work inside the ZIP.
+    content = content.replace(
+        "~~~bash\npython scripts/validate_markdown.py\npython scripts/validate_skill.py\npython scripts/verify_upstream.py\n~~~",
+        "~~~bash\npython -m py_compile runtime/scrapling_memory.py\n~~~",
+    )
+    content = content.replace(
+        "python -m unittest discover -s tests -p 'test_scrapling_memory.py'",
+        "python -m py_compile runtime/scrapling_memory.py",
+    )
     # Every internal link must resolve to a packaged file, not source-only code.
     for target in SKILL_LINK.findall(content):
         if target.startswith(("http://", "https://", "#")):
