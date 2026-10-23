@@ -19,6 +19,43 @@ The goal is a *traceable, typed, validated extract* — not scraping a page
 and letting untrusted text authorize actions. Select the lowest-cost adequate
 fetcher, verify selectors semantically and preserve provenance.
 
+
+## Scrapling Recall — optional local memory (preview)
+
+**Scraping that remembers its extraction evidence, not a general agent brain.**
+The new [standalone Python module](runtime/scrapling_memory.py) attaches a
+local, opt-in SQLite history and site extraction profiles to the independent
+skill. It **does not** replace upstream adaptive-selector memory or spider
+checkpoints; it makes no external requests and needs no API key.
+
+- Host/project scoped extraction profiles with TTL and revalidation warnings.
+- Provenance receipts (source URL, UTC, SHA-256 of typed fields, extractor and
+  pinned versions) and deduplicated business-field snapshots.
+- Six classes: `new`, `unchanged`, `changed`, `moved`, `missing`, `uncertain`.
+- Incomplete/blocked/unverified runs cannot poison previous valid data.
+  Missing confirmation requires two distinct completed crawl run IDs; **nothing
+  is ever automatically deleted**.
+- Explicit opt-in, manual review, retention/erasure and offline tests.
+  No scheduling, vector search, hosted service or live-site proof included.
+
+[Runtime instructions and data boundaries](references/memory.md) ·
+[Research/competitive evidence](references/storm-memory-evidence-2026-10-23.md).
+
+### Minimal use
+
+~~~bash
+# After separately validating a successful Scrapling extraction into typed JSON:
+python runtime/scrapling_memory.py --db ./private/recall.sqlite \
+  --namespace demo observe --url https://example.org/products/42 \
+  --file extraction.json --extractor catalogue-v1 --validated
+python -m unittest discover -s tests -p 'test_scrapling_memory.py' -v
+~~~
+
+**Evidence status:** offline deterministic tests are not a real 3-site
+benchmark, and no time/cost reduction, adoption, or legal compliance is claimed.
+For Agensi, include `runtime/scrapling_memory.py` in the ZIP or do not advertise
+functional memory; do not submit until the QA gate and package audit.
+
 ## Key changes since 0.4.15
 
 - Removed dynamic browser classes → Stealthy/Patchright.
