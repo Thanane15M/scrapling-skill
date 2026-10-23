@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Scrapling Recall — independent skill mark</title>
+  <desc id="desc">A four-legged web crawler surrounding a layered memory core, with a network orbit</desc>
+  <defs>
+    <linearGradient id="shell" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#16BAFF"/>
+      <stop offset="52%" stop-color="#4569F5"/>
+      <stop offset="100%" stop-color="#7A40F3"/>
+    </linearGradient>
+    <linearGradient id="node" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4EE8FF"/>
+      <stop offset="100%" stop-color="#7D55F7"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="241" fill="#0D1433"/>
+  <path d="M108 158Q256 31 407 158M94 231Q256 96 418 231M107 342Q256 459 405 343"
+        fill="none" stroke="#345CCA" stroke-width="8" opacity=".6" stroke-linecap="round"/>
+  <circle cx="104" cy="160" r="14" fill="#3AC7FC"/>
+  <circle cx="406" cy="158" r="19" fill="#7752F6"/>
+  <circle cx="418" cy="232" r="12" fill="#54DFF9"/>
+  <circle cx="107" cy="342" r="12" fill="#7752F6"/>
+  <path d="M191 283L140 300L106 352M184 327L143 354L128 406M321 283L374 300L408 352M328 327L369 354L384 406"
+        fill="none" stroke="#A8CCFF" stroke-width="21" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M191 283L140 300L106 352M184 327L143 354L128 406M321 283L374 300L408 352M328 327L369 354L384 406"
+        fill="none" stroke="#5068BC" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <rect x="170" y="176" width="172" height="175" rx="52" fill="url(#shell)" stroke="#BDD5FF" stroke-width="6"/>
+  <rect x="187" y="197" width="138" height="35" rx="16" fill="#111B49" opacity=".9"/>
+  <rect x="187" y="240" width="138" height="35" rx="16" fill="#111B49" opacity=".9"/>
+  <rect x="187" y="283" width="138" height="35" rx="16" fill="#111B49" opacity=".9"/>
+  <path d="M201 215H290M201 258H275M201 300H299" fill="none"
+        stroke="url(#node)" stroke-width="10" stroke-linecap="round"/>
+  <rect x="190" y="337" width="132" height="62" rx="29" fill="#09122E" stroke="#7491F5" stroke-width="6"/>
+  <ellipse cx="227" cy="366" rx="10" ry="15" fill="#4DE4FF"/>
+  <ellipse cx="285" cy="366" rx="10" ry="15" fill="#4DE4FF"/>
+  <circle cx="140" cy="300" r="8" fill="#60DDFC"/>
+  <circle cx="374" cy="300" r="8" fill="#60DDFC"/>
+  <circle cx="143" cy="354" r="8" fill="#70A9FF"/>
+  <circle cx="369" cy="354" r="8" fill="#70A9FF"/>
+</svg>
