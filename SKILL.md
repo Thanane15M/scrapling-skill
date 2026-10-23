@@ -125,6 +125,21 @@ narrow tool authorization and appropriate approval.
   Surface this as blocked/error, never an empty successful crawl.
 - Markdown whitespace, generated selectors and UTF-8 text output can differ.
 
+## Optional validated extraction memory (independent v1)
+
+This skill can optionally use a **local SQLite memory** for validated extraction
+profiles, field-hash change detection, and provenance receipts. This is NOT
+Scrapling's own adaptive-selector SQLite and does not replace its checkpoints.
+Import `scripts.extraction_memory.ExtractionMemory`; see
+[Extraction memory contract and example](references/extraction-memory.md).
+Profiles expire; past results never authorize new output. Treat blocked or
+ambiguous pages as `uncertain`, never as missing. A missing result requires
+at least three separate verified absences and is never evidence for deletion.
+This is **optional and not validated on live sites**. The memory stores no raw
+field values or URL query parameters, but hashes can still leak low-entropy
+information; apply retention, privacy and access controls. Do not advertise
+live-site reliability or cost reduction until benchmarked.
+
 ## Security boundary for arbitrary source URLs
 
 Validate schemes and hosts; resolve and reject private, loopback, link-local
