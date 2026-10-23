@@ -29,5 +29,7 @@ jobs:
         run: python scripts/validate_skill.py
       - name: Verify installed Scrapling API surface
         run: python scripts/verify_upstream.py
+      - name: Test optional extraction memory (offline)
+        run: python -m unittest discover -s tests -v
       - name: Compile deterministic scripts
         run: python -m compileall -q scripts

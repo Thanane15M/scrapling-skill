@@ -29,6 +29,22 @@ fetcher, verify selectors semantically and preserve provenance.
 - Robots, response.follow, request fingerprints and Markdown output changed.
 - Full [migration checklist](references/migration-v0.5.md).
 
+## New: opt-in, local extraction memory (experimental)
+
+The [memory contract](references/extraction-memory.md) adds SQLite site profiles
+with TTL, field-hash change detection, a provenance receipt journal and
+conservative missing-state handling. Unlike Scrapling's adaptive-selector
+memory, this records **validated extraction outcomes**. No external service
+or LLM is required. **NOT_PROVEN on live sites:** offline unit tests only;
+benchmarks and authorization-aware site tests remain release gates.
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The Agensi ZIP memory edition must include `scripts/extraction_memory.py`;
+do not package the old skill-only list without the runtime module.
+
 ## Install and validate
 
 ~~~bash
