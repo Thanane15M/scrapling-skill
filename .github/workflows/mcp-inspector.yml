@@ -28,12 +28,12 @@ jobs:
           node-version: "22.19.0"
       - name: Install pinned Scrapling compatibility environment
         run: python -m pip install --requirement requirements-dev.txt
-      - name: List Scrapling MCP tools through Inspector 2.8.0
+      - name: List Scrapling MCP tools through Inspector 2.12.0
         env:
           NPM_CONFIG_AUDIT: "false"
           NPM_CONFIG_FUND: "false"
         run: |
-          npx --yes @modelcontextprotocol/inspector@2.8.0 --cli scrapling mcp \
+          npx --yes @modelcontextprotocol/inspector@2.12.0 --cli scrapling mcp \
             --method tools/list \
             --format json > /tmp/mcp-tools.json
           python scripts/assert_mcp_inspector_tools.py /tmp/mcp-tools.json
