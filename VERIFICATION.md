@@ -25,7 +25,7 @@ current branch passed: check exact workflow run before promoting a status.
 - https://github.com/D4Vinci/Scrapling/blob/v0.5/docs/migrating-to-v0.5.md
 - https://github.com/D4Vinci/Scrapling/blob/v0.5/docs/ai/mcp-server.md
 - https://github.com/D4Vinci/Scrapling/blob/v0.5/docs/ai/building-rag-systems.md
-- https://github.com/modelcontextprotocol/inspector/releases/tag/2.8.0
+- https://github.com/modelcontextprotocol/inspector/releases/tag/2.12.0
 
 ## Verification and release gates
 
