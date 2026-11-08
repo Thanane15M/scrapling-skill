@@ -1,6 +1,6 @@
 # Verification matrix — Scrapling 0.5
 
-**Scrapling evidence review: 2026-10-21; MCP Inspector security review: 2026-11-01.** PyPI released upstream **0.5**
+**Scrapling evidence review: 2026-10-21; MCP Inspector security review: 2026-11-08.** PyPI released upstream **0.5**
 on 2026-10-17. The existence of CI scripts is *not* evidence that the
 current branch passed: check exact workflow run before promoting a status.
 
@@ -13,7 +13,7 @@ current branch passed: check exact workflow run before promoting a status.
 | MCP v0.5 exposes 16 named tools, no bulk | VERIFIED upstream docs; Inspector confirmation conditional on green current CI |
 | Python imports/parameter assumptions work in pinned wheel | VERIFIED_IN_CI only when quality gate passes |
 | MCP stdio initialization/tools/list work | VERIFIED_IN_CI only when MCP black-box passes |
-| MCP Inspector 2.13.0 and Node.js 22.23.4 are pinned for security qualification | VERIFIED configuration; runtime compatibility is NOT_PROVEN until CI passes at the exact PR SHA |
+| MCP Inspector 2.14.0 and Node.js 22.23.4 are pinned for security qualification | VERIFIED configuration; runtime compatibility is NOT_PROVEN until CI passes at the exact PR SHA |
 | response.follow method/body/params inheritance removed | VERIFIED upstream migration guide |
 | robots.txt fetch error can block crawl with robots_txt_obey=True | VERIFIED upstream migration guide |
 | Adaptive relocation guarantees correct business fields | REJECTED — semantics require validation |
@@ -26,7 +26,7 @@ current branch passed: check exact workflow run before promoting a status.
 - https://github.com/D4Vinci/Scrapling/blob/v0.5/docs/migrating-to-v0.5.md
 - https://github.com/D4Vinci/Scrapling/blob/v0.5/docs/ai/mcp-server.md
 - https://github.com/D4Vinci/Scrapling/blob/v0.5/docs/ai/building-rag-systems.md
-- https://github.com/modelcontextprotocol/inspector/releases/tag/2.13.0
+- https://github.com/modelcontextprotocol/inspector/releases/tag/2.14.0
 - https://nodejs.org/en/blog/release/v22.23.4
 
 ## Verification and release gates
@@ -38,7 +38,7 @@ python scripts/validate_skill.py
 python scripts/verify_upstream.py
 ~~~
 
-CI also uses pinned MCP Inspector 2.13.0 on Node.js 22.23.4 to inspect 16 tools through stdio. This does
+CI also uses pinned MCP Inspector 2.14.0 on Node.js 22.23.4 to inspect 16 tools through stdio. This does
 not prove authorized browser startup or target-site extraction.
 Before production use, exercise realistic browser, HTTP, robots, DOM drift,
 checkpoint, schema-validation and error cases. Recheck compatibility when
